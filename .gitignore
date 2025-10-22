@@ -1,0 +1,33 @@
+# === Ignore large files and outputs ===
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.h5
+*.npy
+*.npz
+*.pkl
+*.tar
+*.tar.gz
+*.zip
+
+# === Ignore heavy directories ===
+model/
+output/
+outputs/
+finetune/output/
+data/
+datasets/
+results/
+checkpoints/
+wandb/
+runs/
+
+# === Python cache and logs ===
+__pycache__/
+*.pyc
+*.log
+*.tmp
+*.csv
+*.ipynb_checkpoints/
