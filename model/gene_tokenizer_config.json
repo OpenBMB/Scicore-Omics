@@ -1,0 +1,30 @@
+{
+  "architectures": [
+    "NicheformerForMaskedLM"
+  ],
+  "assay": true,
+  "batch_first": true,
+  "cls_classes": 164,
+  "context_length": 1500,
+  "dim_feedforward": 1024,
+  "dim_model": 512,
+  "dropout": 0.0,
+  "learnable_pe": true,
+  "masking_p": 0.15,
+  "modality": true,
+  "model_type": "nicheformer",
+  "n_tokens": 20340,
+  "nheads": 16,
+  "nlayers": 12,
+  "specie": true,
+  "supervised_task": null,
+  "torch_dtype": "float32",
+  "transformers_version": "4.49.0",
+  "auto_map": {
+    "AutoConfig": "configuration_nicheformer.NicheformerConfig",
+    "AutoModelForMaskedLM": "modeling_nicheformer.NicheformerForMaskedLM",
+    "AutoModel": "modeling_nicheformer.NicheformerModel",
+    "AutoTokenizer": ["tokenization_nicheformer.NicheformerTokenizer", null]
+  },
+  "gene_tokenizer_class": "NicheformerTokenizer"
+}

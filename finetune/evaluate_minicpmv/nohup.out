@@ -1,13 +1,0 @@
-Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.35it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.36it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.41it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.66it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.54it/s]
-Traceback (most recent call last):
-  File "/data2/xiaoxinyu/minicpm-v-2_6/MiniCPM-V/finetune/evaluate_minicpmv/evaluate_lmm.py", line 64, in <module>
-    model = PeftModel.from_pretrained(
-  File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/peft/peft_model.py", line 555, in from_pretrained
-    load_result = model.load_adapter(
-  File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/peft/peft_model.py", line 1320, in load_adapter
-    adapters_weights = load_peft_weights(
-  File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/peft/utils/save_and_load.py", line 652, in load_peft_weights
-    adapters_weights = safe_load_file(filename, device=device)
-  File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/safetensors/torch.py", line 315, in load_file
-    result[k] = f.get_tensor(k)
-KeyboardInterrupt
