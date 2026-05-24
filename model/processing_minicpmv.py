@@ -22,7 +22,7 @@ import re
 from PIL import Image
 import anndata as ad
 import numpy as np
-
+import os
 from transformers import AutoTokenizer
 from transformers.image_processing_utils import BatchFeature
 from transformers.image_utils import ImageInput
@@ -43,15 +43,17 @@ class MiniCPMVProcessor(ProcessorMixin):
     def __init__(self, image_processor=None, tokenizer=None, gene_tokenizer=None, **kwargs):
         super().__init__(image_processor, tokenizer, gene_tokenizer, **kwargs)
         self.version = kwargs.get("version", 2.6)
-        self.gene_tokenizer = AutoTokenizer.from_pretrained(
-            "/data2/xiaoxinyu/project/model/gene_tokenizer", trust_remote_code=True
-        )
+        # BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        # tokenizer_dir = os.path.join(BASE_DIR, "gene_tokenizer")
+        # self.gene_tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, trust_remote_code=True)
+        # technology_mean_path = os.path.join(tokenizer_dir, "xenium_mean_script.npy")
+        self.gene_tokenizer = AutoTokenizer.from_pretrained("/data2/xiaoxinyu/project/model/gene_tokenizer", trust_remote_code=True)
         technology_mean_path = '/data2/xiaoxinyu/project/model/gene_tokenizer/xenium_mean_script.npy'
         technology_mean = np.load(technology_mean_path)
         self.gene_tokenizer._load_technology_mean(technology_mean)
 
-        print(f"[DEBUG] tokenizer type = {type(self.tokenizer)}")
-        print(f"[DEBUG] gene_tokenizer type = {type(self.gene_tokenizer)}")
+        # print(f"[DEBUG] tokenizer type = {type(self.tokenizer)}")
+        # print(f"[DEBUG] gene_tokenizer type = {type(self.gene_tokenizer)}")
 
     def __call__(
         self,
@@ -72,7 +74,7 @@ class MiniCPMVProcessor(ProcessorMixin):
             image_inputs = self.image_processor(
                 images, do_pad=do_pad, max_slice_nums=max_slice_nums, return_tensors=return_tensors
             )
-            print(f"[DEBUG] 成功获取image_inputs : {image_inputs.keys()}")
+            # print(f"[DEBUG] 成功获取image_inputs : {image_inputs.keys()}")
 
 
         # Step 2: Process gene data
@@ -81,7 +83,7 @@ class MiniCPMVProcessor(ProcessorMixin):
                 adata = gene_data[0][0]
                 gene_arrays = adata.X 
                 gene_inputs = self.gene_tokenizer(gene_arrays)
-                print(f"[DEBUG] 成功获取gene_inputs : {gene_inputs.keys()}")
+                # print(f"[DEBUG] 成功获取gene_inputs : {gene_inputs.keys()}")
 
 
         # Step 3: Merge modalities
@@ -145,11 +147,13 @@ class MiniCPMVProcessor(ProcessorMixin):
                 final_text = ""
                 for i in range(len(gene_tags)):
                     gene_tokens = gene_inputs["input_ids"][index]
-                    gene_token_str = " ".join(map(str, gene_tokens.tolist()))
-                    final_text += text_chunks[i] + f"<gene_id>{i}</gene_id><gene>{gene_token_str}</gene>"
+                    # gene_token_str = " ".join(map(str, gene_tokens.tolist()))
+                    # final_text += text_chunks[i] + f"<gene_id>{i}</gene_id><gene>{gene_token_str}</gene>"
+                    dummy_placeholder = "<unk>" * 32
+                    final_text += text_chunks[i] + f"<gene_id>{i}</gene_id><gene>{dummy_placeholder}</gene>"
                 final_text += text_chunks[-1]
 
-            print(f"[DeBUG] final_text: {final_text}")
+            # print(f"[DeBUG] final_text: {final_text}")
 
 
             # 🔑 get input_ids and image_bounds directly
@@ -177,14 +181,23 @@ class MiniCPMVProcessor(ProcessorMixin):
 
         attention_mask = padded_input_ids.ne(self.tokenizer.pad_token_id)
         
-        print(f"[DeBUG] padded_input_ids: {padded_input_ids}")
-        print(f"[DeBUG] attention_mask: {attention_mask}")
-        print(f"[DeBUG] image_bounds_list: {image_bounds_list}")
-        print(f"[DeBUG] gene_bounds_list: {gene_bounds_list}")
+        labels = padded_input_ids.clone()
+        labels[~attention_mask] = -100  # padding 不算loss
+        # gene span 不算loss
+        for i, gb in enumerate(gene_bounds_list):
+            if torch.is_tensor(gb) and gb.numel() > 0:
+                for (s, e) in gb.tolist():
+                    labels[i, s:e] = -100
+        
+        # print(f"[DeBUG] padded_input_ids: {padded_input_ids}")
+        # print(f"[DeBUG] attention_mask: {attention_mask}")
+        # print(f"[DeBUG] image_bounds_list: {image_bounds_list}")
+        # print(f"[DeBUG] gene_bounds_list: {gene_bounds_list}")
         
         data = {
             "input_ids": padded_input_ids,
             "attention_mask": attention_mask,
+            "labels": labels,
             "image_bound": image_bounds_list,  # ✅ tensor [N,2]
             "gene_bound": gene_bounds_list,
         }

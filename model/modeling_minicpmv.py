@@ -1,22 +1,47 @@
 import math
 from typing import List, Optional
 import json
-import torch
-import torchvision
-import anndata as ad
-import torch.nn as nn
+import os
 from threading import Thread
 from copy import deepcopy
+
+import torch
+import torch.nn as nn
+import torchvision
+import anndata as ad
 from PIL import Image
+
 from transformers import AutoProcessor, Qwen2PreTrainedModel, Qwen2ForCausalLM, TextIteratorStreamer
 
 from .configuration_minicpm import MiniCPMVConfig
 from .modeling_navit_siglip import SiglipVisionTransformer
 from .resampler import Resampler
-from .processing_minicpmv import MiniCPMVProcessor 
-# 导入 Nicheformer 类
-from .modeling_nicheformer import NicheformerModel  
-from .configuration_nicheformer import NicheformerConfig  
+from .processing_minicpmv import MiniCPMVProcessor
+
+# gene
+from .modeling_nicheformer import NicheformerModel
+from .configuration_nicheformer import NicheformerConfig
+from .gene_projector_module import GeneProjector
+from .gene_qformer_module import GeneQFormerBiomedBERT
+
+def _is_debug_enabled() -> bool:
+    return os.getenv("DEBUG_GENE", "0") == "1"
+
+
+def _assert_finite(x: torch.Tensor, name: str):
+    if not torch.is_tensor(x):
+        return
+    if not torch.isfinite(x).all():
+        # 打印一些统计，方便定位
+        with torch.no_grad():
+            finite_mask = torch.isfinite(x)
+            num_bad = (~finite_mask).sum().item()
+            msg = (
+                f"[NaN/Inf Detected] {name} has non-finite values. "
+                f"bad_count={num_bad}, dtype={x.dtype}, device={x.device}, shape={tuple(x.shape)}"
+            )
+        raise RuntimeError(msg)
+
 
 class MiniCPMVPreTrainedModel(Qwen2PreTrainedModel):
     config_class = MiniCPMVConfig
@@ -26,52 +51,55 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.llm = Qwen2ForCausalLM(config)
+
         self.vpm = self.init_vision_module()
         self.vision_dim = self.vpm.embed_dim
         self.embed_dim = self.llm.config.hidden_size
+
         self.resampler = self.init_resampler(self.embed_dim, self.vision_dim)
-        
-        # 初始化基因模块和投影层
+
+        # ===== Gene modules =====
         self.nicheformer = self.init_gene_module(config)
-        self.gene_dim = self.nicheformer.config.dim_model 
-        # self.gene_projector = nn.Linear(self.gene_dim, self.embed_dim) 
-        self.gene_projector = nn.Sequential(
-            nn.Linear(512, 1024),  # net.0
-            nn.ReLU(),
-            nn.LayerNorm(1024),    # net.3
-            nn.Linear(1024, 2048), # net.4
-            nn.ReLU(),
-            nn.LayerNorm(2048),    # net.7
-            nn.Linear(2048, 3584)  # net.8
+        self.gene_dim = self.nicheformer.config.dim_model  # e.g. 512
+
+        self.gene_qformer = GeneQFormerBiomedBERT(
+            biomedbert_name="/data2/xiaoxinyu/biomedbert",  # 只用来读 config（不会加载权重）
+            gene_in_dim=self.gene_dim,  # 512
+            hidden=768,
+            num_queries=32,
+            load_pretrained_bert=False,  # ✅ 关键：不从 biomedbert 加载权重
         )
 
-        
+        # Project: 768 -> LLM hidden (e.g. 3584)
+        self.gene_projector = GeneProjector(in_dim=768, out_dim=self.embed_dim)
+
         self.processor = None
         self.terminators = ['<|im_end|>', '<|endoftext|>']
         self._generate = self.generate
-    
-    # 添加基因模块初始化方法
+
+        self._gene_fp32_forced = False
+
+        # self.post_init()
+
     def init_gene_module(self, config):
         if hasattr(config, "gene_config"):
             return NicheformerModel(config.gene_config)
         else:
             nicheformer_config = NicheformerConfig()
             return NicheformerModel(nicheformer_config)
-    
+
     def init_vision_module(self):
-        # same as HuggingFaceM4/siglip-so400m-14-980-flash-attn2-navit add tgt_sizes
         if self.config._attn_implementation == 'flash_attention_2':
             self.config.vision_config._attn_implementation = 'flash_attention_2'
         else:
-            # not suport sdpa
             self.config.vision_config._attn_implementation = 'eager'
+
         model = SiglipVisionTransformer(self.config.vision_config)
         if self.config.drop_vision_last_layer:
             model.encoder.layers = model.encoder.layers[:-1]
 
         setattr(model, 'embed_dim', model.embeddings.embed_dim)
         setattr(model, 'patch_size', model.embeddings.patch_size)
-
         return model
 
     def init_resampler(self, embed_dim, vision_dim):
@@ -101,29 +129,36 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
     def get_decoder(self):
         return self.llm
 
+
     def get_vllm_embedding(self, data):
-        
+        dtype = self.llm.model.embed_tokens.weight.dtype
+        device = self.llm.model.embed_tokens.weight.device
+        self.gene_qformer = self.gene_qformer.float()
+        self.gene_projector = self.gene_projector.float()
+
+        # =========================
+        # 1) Vision
+        # =========================
         if 'vision_hidden_states' not in data:
-            dtype = self.llm.model.embed_tokens.weight.dtype
-            device = self.llm.model.embed_tokens.weight.device
             tgt_sizes = data['tgt_sizes']
             pixel_values_list = data['pixel_values']
             vision_hidden_states = []
             all_pixel_values = []
             img_cnt = []
+
             for pixel_values in pixel_values_list:
                 img_cnt.append(len(pixel_values))
                 all_pixel_values.extend([i.flatten(end_dim=1).permute(1, 0) for i in pixel_values])
 
-            # exist image
             if all_pixel_values:
                 tgt_sizes = [tgt_size for tgt_size in tgt_sizes if isinstance(tgt_size, torch.Tensor)]
                 tgt_sizes = torch.vstack(tgt_sizes).type(torch.int32)
 
                 max_patches = torch.max(tgt_sizes[:, 0] * tgt_sizes[:, 1])
 
-                all_pixel_values = torch.nn.utils.rnn.pad_sequence(all_pixel_values, batch_first=True,
-                                                                   padding_value=0.0)
+                all_pixel_values = torch.nn.utils.rnn.pad_sequence(
+                    all_pixel_values, batch_first=True, padding_value=0.0
+                )
                 B, L, _ = all_pixel_values.shape
                 all_pixel_values = all_pixel_values.permute(0, 2, 1).reshape(B, 3, -1, L)
 
@@ -132,136 +167,191 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
                     patch_attn_mask[i, 0, :tgt_sizes[i][0] * tgt_sizes[i][1]] = True
 
                 vision_batch_size = self.config.vision_batch_size
-                all_pixel_values = all_pixel_values.type(dtype)
+                all_pixel_values = all_pixel_values.to(device=device, dtype=dtype)
+
                 if B > vision_batch_size:
                     hs = []
                     for i in range(0, B, vision_batch_size):
                         start_idx = i
                         end_idx = i + vision_batch_size
-                        tmp_hs = self.vpm(all_pixel_values[start_idx:end_idx], patch_attention_mask=patch_attn_mask[start_idx:end_idx], tgt_sizes=tgt_sizes[start_idx:end_idx]).last_hidden_state
+                        tmp_hs = self.vpm(
+                            all_pixel_values[start_idx:end_idx],
+                            patch_attention_mask=patch_attn_mask[start_idx:end_idx],
+                            tgt_sizes=tgt_sizes[start_idx:end_idx]
+                        ).last_hidden_state
                         hs.append(tmp_hs)
                     vision_embedding = torch.cat(hs, dim=0)
                 else:
-                    vision_embedding = self.vpm(all_pixel_values, patch_attention_mask=patch_attn_mask, tgt_sizes=tgt_sizes).last_hidden_state
+                    vision_embedding = self.vpm(
+                        all_pixel_values,
+                        patch_attention_mask=patch_attn_mask,
+                        tgt_sizes=tgt_sizes
+                    ).last_hidden_state
+
                 vision_embedding = self.resampler(vision_embedding, tgt_sizes)
 
                 start = 0
                 for pixel_values in pixel_values_list:
-                    img_cnt = len(pixel_values)
-                    if img_cnt > 0:
-                        vision_hidden_states.append(vision_embedding[start: start + img_cnt])
-                        start += img_cnt
+                    c = len(pixel_values)
+                    if c > 0:
+                        vision_hidden_states.append(vision_embedding[start: start + c])
+                        start += c
                     else:
                         vision_hidden_states.append([])
-            else: # no image
+            else:
+                # no image
                 if self.training:
-                    dummy_image = torch.zeros(
-                        (1, 3, 224, 224),
-                        device=device, dtype=dtype
-                    )
-                    tgt_sizes = torch.Tensor([[(224 // self.config.patch_size), math.ceil(224 / self.config.patch_size)]]).type(torch.int32)
-                    dummy_feature = self.resampler(self.vpm(dummy_image).last_hidden_state, tgt_sizes)
+                    dummy_image = torch.zeros((1, 3, 224, 224), device=device, dtype=dtype)
+                    tgt_sizes_dummy = torch.Tensor(
+                        [[(224 // self.config.patch_size), math.ceil(224 / self.config.patch_size)]]
+                    ).type(torch.int32)
+                    dummy_feature = self.resampler(self.vpm(dummy_image).last_hidden_state, tgt_sizes_dummy)
                 else:
                     dummy_feature = []
                 for _ in range(len(pixel_values_list)):
                     vision_hidden_states.append(dummy_feature)
-
         else:
             vision_hidden_states = data['vision_hidden_states']
-            
-            
-        # 处理基因数据
-        gene_hidden_states = [None] * len(data['input_ids'])
+
+        # =========================
+        # 2) Gene
+        # =========================
+        bs = len(data['input_ids'])
+        gene_hidden_states = [None] * bs
+
         if 'gene_input_ids' in data and data['gene_input_ids'] is not None:
-            print(f"[DeBUG] gene_input_ids shape: {data['gene_input_ids'].shape}")
             gene_input_ids = data['gene_input_ids'].to(device)
             gene_attention_mask = data.get('gene_attention_mask', None)
             if gene_attention_mask is not None:
                 gene_attention_mask = gene_attention_mask.to(device)
 
-            # 使用 Nicheformer 的 forward 方法获取嵌入
-            # Nicheformer forward 输出 shape: [batch, seq_len, dim_model]
+            # Nicheformer: expect [B, seq_len, gene_dim]
             nicheformer_output = self.nicheformer.forward(
                 input_ids=gene_input_ids,
                 attention_mask=gene_attention_mask
             )
-            # 因为每个样本只有一个 <gene>，取 seq_len 维度的 mean 或第一个 token
-            # [batch, dim_model]
-            gene_embedding = nicheformer_output.mean(dim=1) 
-            print(f"[DeBUG] gene_embedding shape: {gene_embedding.shape}")
-            # 投影到 LLM 嵌入维度
-            target_dtype = self.gene_projector[0].weight.dtype
-            gene_embedding = gene_embedding.to(target_dtype)
-            gene_embedding = self.gene_projector(gene_embedding)
-            print(f"[DeBUG] gene_embedding_projection shape: {gene_embedding.shape}")
 
-            # 插入到对应位置
-            for i, bounds in enumerate(data['gene_bound']):
-                if len(bounds) == 0:  # 没有 <gene> token
+            # 丢掉前 3 个 special token（按你当前实现）
+            gene_tokens = nicheformer_output[:, 3:, :]  # [B, L, 512]
+
+            gene_pad_mask = None
+            if gene_attention_mask is not None:
+                gene_pad_mask = (gene_attention_mask[:, 3:] == 0)
+
+            # dtype 对齐：以 gene_qformer 的参数 dtype 为准
+            qformer_dtype = next(self.gene_qformer.parameters()).dtype
+            gene_tokens = gene_tokens.to(dtype=qformer_dtype)
+
+            # Q-Former: [B, L, 512] -> [B, 32, 768]
+            q_tokens = self.gene_qformer(gene_tokens, gene_pad_mask=gene_pad_mask)
+
+            # Projector: [B, 32, 768] -> [B, 32, embed_dim]
+            proj_dtype = next(self.gene_projector.parameters()).dtype
+            q_tokens = q_tokens.to(dtype=proj_dtype)
+            gene_tokens_llm = self.gene_projector(q_tokens)  # [B, 32, 3584]
+            _assert_finite(gene_tokens, "gene_tokens(after nicheformer)")
+            _assert_finite(q_tokens, "q_tokens(after qformer)")
+            _assert_finite(gene_tokens_llm, "gene_tokens_llm(after projector)")
+
+            # # 插入到对应位置（默认每个样本最多 1 个 <gene> span）
+            # gene_bounds = data.get('gene_bound', [[] for _ in range(bs)])
+            # for i, bounds in enumerate(gene_bounds):
+            #     if not bounds:
+            #         continue
+            #     gene_hidden_states[i] = gene_tokens_llm[i]  # [32, embed_dim]
+
+            gene_bounds = data.get('gene_bound', [None] * bs)
+
+            for i, bounds in enumerate(gene_bounds):
+                # bounds can be: None, [], or a Tensor of shape [N,2]
+                if bounds is None:
                     continue
-                gene_hidden_states[i] = gene_embedding[i].unsqueeze(0)
-        
-        input_ids = data['input_ids']
-        print("[DEBUG] input_ids :", input_ids)
-        print("[DEBUG] input_ids dtype:", input_ids.dtype)
-        print("[DEBUG] input_ids min/max:", input_ids.min().item(), input_ids.max().item())
-        print("[DEBUG] embedding num_embeddings:", self.llm.model.embed_tokens.num_embeddings)
+                if isinstance(bounds, list) and len(bounds) == 0:
+                    continue
+                if torch.is_tensor(bounds) and bounds.numel() == 0:
+                    continue
 
+                # 默认每个样本只用第一个 gene span（你当前设定）
+                gene_hidden_states[i] = gene_tokens_llm[i]  # [32, embed_dim]
+
+        # =========================
+        # 3) Text token embeddings
+        # =========================
         if hasattr(self.llm.config, 'scale_emb'):
             vllm_embedding = self.llm.model.embed_tokens(data['input_ids']) * self.llm.config.scale_emb
         else:
             vllm_embedding = self.llm.model.embed_tokens(data['input_ids'])
-            
+
         new_vllm_embedding = vllm_embedding.clone()
 
-        vision_hidden_states = [i.type(vllm_embedding.dtype) if isinstance(
-            i, torch.Tensor) else i for i in vision_hidden_states]
-        
-        # 确保基因嵌入的数据类型和设备与文本嵌入匹配
-        gene_hidden_states = [i.type(vllm_embedding.dtype).to(vllm_embedding.device) if isinstance(
-            i, torch.Tensor) else i for i in gene_hidden_states]
-        
-        print("[DEBUG] new_vllm_embedding shape:", new_vllm_embedding.shape)
+        # dtype/device align
+        vision_hidden_states = [
+            x.to(dtype=vllm_embedding.dtype, device=vllm_embedding.device) if torch.is_tensor(x) else x
+            for x in vision_hidden_states
+        ]
+        gene_hidden_states = [
+            x.to(dtype=vllm_embedding.dtype, device=vllm_embedding.device) if torch.is_tensor(x) else x
+            for x in gene_hidden_states
+        ]
 
-        bs = len(data['input_ids'])
+        # =========================
+        # 4) Scatter insert: image + gene
+        # =========================
         for i in range(bs):
+            # ---- image ----
             cur_vs_hs = vision_hidden_states[i]
-            print("[DEBUG] len(cur_vs_hs) :", len(cur_vs_hs))
-            if len(cur_vs_hs) > 0:
+            if torch.is_tensor(cur_vs_hs) and cur_vs_hs.numel() > 0:
                 cur_vllm_emb = vllm_embedding[i]
                 cur_image_bound = data['image_bound'][i]
                 if len(cur_image_bound) > 0:
-                    image_indices = torch.cat(
-                        [torch.arange(r[0], r[1], dtype=torch.long) 
-                         for r in cur_image_bound if (r[1] - r[0]) > 1]
-                    ).to(vllm_embedding.device)
-                    new_vllm_embedding[i] = cur_vllm_emb.scatter(0, image_indices.view(-1, 1).repeat(1, cur_vllm_emb.shape[-1]),
-                                          cur_vs_hs.view(-1, cur_vs_hs.shape[-1]))
+                    image_indices = torch.cat([
+                        torch.arange(r[0], r[1], dtype=torch.long, device=vllm_embedding.device)
+                        for r in cur_image_bound if (r[1] - r[0]) > 1
+                    ])
+                    new_vllm_embedding[i] = cur_vllm_emb.scatter(
+                        0,
+                        image_indices.view(-1, 1).repeat(1, cur_vllm_emb.shape[-1]),
+                        cur_vs_hs.view(-1, cur_vs_hs.shape[-1])
+                    )
                 elif self.training:
                     new_vllm_embedding[i] += cur_vs_hs[0].mean() * 0
-            
 
-            # # 插入基因嵌入
-            # cur_gene_hs = gene_hidden_states[i]
-            # if cur_gene_hs is not None:
-            #     cur_vllm_emb = new_vllm_embedding[i]
-            #     cur_gene_bound = data.get('gene_bound', [[]])[i] 
-                
-            #     # 如果gene_bound存在，则插入基因嵌入
-            #     if len(cur_gene_bound) > 0:
-            #         gene_indices = cur_gene_bound[0].to(vllm_embedding.device)
-            #         new_vllm_embedding[i] = cur_vllm_emb.scatter(
-            #             0, 
-            #             gene_indices.view(-1, 1).repeat(1, cur_vllm_emb.shape[-1]),
-            #             cur_gene_hs.view(-1, cur_gene_hs.shape[-1])
-            #         )
+            # ---- gene ----
+            cur_gene_hs = gene_hidden_states[i]
+            if cur_gene_hs is not None:
+                cur_gene_bound = data.get('gene_bound', [[] for _ in range(bs)])[i]
+                if len(cur_gene_bound) > 0:
+                    r = cur_gene_bound[0]  # [start, end)
+                    gene_indices = torch.arange(
+                        r[0], r[1], dtype=torch.long, device=vllm_embedding.device
+                    )
+                    span = gene_indices.numel()
+                    if span != cur_gene_hs.shape[0]:
+                        raise ValueError(
+                            f"[GeneSpanMismatch] gene span={span}, gene tokens={cur_gene_hs.shape[0]} "
+                            f"(expect 32). Check processor placeholder length."
+                        )
+
+                    cur_vllm_emb = new_vllm_embedding[i]
+                    new_vllm_embedding[i] = cur_vllm_emb.scatter(
+                        0,
+                        gene_indices.view(-1, 1).repeat(1, cur_vllm_emb.shape[-1]),
+                        cur_gene_hs.to(cur_vllm_emb.dtype)  # [32, embed_dim]
+                    )
+
+        if _is_debug_enabled():
+            if "gene_bound" in data and len(data["gene_bound"]) > 0 and len(data["gene_bound"][0]) > 0:
+                gb0 = data["gene_bound"][0]
+                print("[DEBUG] gene_bound[0]:", gb0)
+                print("[DEBUG] gene_span[0]:", gb0[0][1] - gb0[0][0])
+
+        _assert_finite(new_vllm_embedding, "new_vllm_embedding(final inputs_embeds)")
 
         return new_vllm_embedding, vision_hidden_states
 
-
     def forward(self, data, **kwargs):
-        
         vllm_embedding, vision_hidden_states = self.get_vllm_embedding(data)
+
         position_ids = data["position_ids"]
         if position_ids.dtype != torch.int64:
             position_ids = position_ids.long()
@@ -276,7 +366,7 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
             inputs_embeds=vllm_embedding,
             **kwargs
         )
-    
+
     def _decode(self, inputs_embeds, tokenizer, attention_mask, decode_text=False, **kwargs):
         terminators = [tokenizer.convert_tokens_to_ids(i) for i in self.terminators]
         output = self.llm.generate(
@@ -303,7 +393,6 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
 
         thread = Thread(target=self.llm.generate, kwargs=generation_kwargs)
         thread.start()
-    
         return streamer
 
     def _decode_text(self, result_ids, tokenizer):
@@ -324,9 +413,9 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
         pixel_values=None,
         tgt_sizes=None,
         image_bound=None,
-        gene_input_ids=None,  # 基因数据参数
-        gene_attention_mask=None, # 基因注意力掩码
-        gene_bound=None, # 基因边界参数
+        gene_input_ids=None,
+        gene_attention_mask=None,
+        gene_bound=None,
         attention_mask=None,
         tokenizer=None,
         vision_hidden_states=None,
@@ -336,7 +425,6 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
         **kwargs
     ):
         assert input_ids is not None
-        # 检查输入维度是否一致
         if pixel_values is not None:
             assert len(input_ids) == len(pixel_values)
         if gene_input_ids is not None:
@@ -357,19 +445,21 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
             model_inputs["vision_hidden_states"] = vision_hidden_states
 
         with torch.inference_mode():
-            (
-                model_inputs["inputs_embeds"],
-                vision_hidden_states,
-            ) = self.get_vllm_embedding(model_inputs)
+            model_inputs["inputs_embeds"], vision_hidden_states = self.get_vllm_embedding(model_inputs)
 
             if stream:
                 result = self._decode_stream(model_inputs["inputs_embeds"], tokenizer, **kwargs)
             else:
-                result = self._decode(model_inputs["inputs_embeds"], tokenizer, attention_mask, decode_text=decode_text, **kwargs)
+                result = self._decode(
+                    model_inputs["inputs_embeds"],
+                    tokenizer,
+                    attention_mask,
+                    decode_text=decode_text,
+                    **kwargs
+                )
 
         if return_vision_hidden_states:
             return result, vision_hidden_states
-        
         return result
 
     def chat(
@@ -377,7 +467,7 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
         msgs,
         tokenizer,
         image=None,
-        gene_sequence=None, #  添加基因序列参数
+        gene_sequence=None,
         processor=None,
         vision_hidden_states=None,
         max_new_tokens=2048,
@@ -394,52 +484,43 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
             batched = True
         else:
             batched = False
+
         msgs_list = msgs
         images_list = image
-        gene_sequences_list = gene_sequence # 创建基因列表
-        
+        gene_sequences_list = gene_sequence
+
         if batched is False:
             images_list, msgs_list = [images_list], [msgs_list]
-            gene_sequences_list = [gene_sequences_list] # 包装单条基因序列
+            gene_sequences_list = [gene_sequences_list]
         else:
             assert images_list is None, "Please integrate image to msgs when using batch inference."
             images_list = [None] * len(msgs_list)
+
         assert len(images_list) == len(msgs_list), "The batch dim of images_list and msgs_list should be the same."
-        
-        # print(f"[DEBUG] images_list is : {images_list}")
-        # print(f"[DEBUG] gene_sequence is : {gene_sequences_list}")
-        
+
         if processor is None:
             if self.processor is None:
                 self.processor = AutoProcessor.from_pretrained(self.config._name_or_path, trust_remote_code=True)
             processor = self.processor
-        
-        assert self.config.query_num == processor.image_processor.image_feature_size, "These two values should be the same. Check `config.json` and `preprocessor_config.json`."
-        assert self.config.patch_size == processor.image_processor.patch_size, "These two values should be the same. Check `config.json` and `preprocessor_config.json`."
-        assert self.config.use_image_id == processor.image_processor.use_image_id, "These two values should be the same. Check `config.json` and `preprocessor_config.json`."
-        assert self.config.slice_config.max_slice_nums == processor.image_processor.max_slice_nums, "These two values should be the same. Check `config.json` and `preprocessor_config.json`."
-        assert self.config.slice_mode == processor.image_processor.slice_mode, "These two values should be the same. Check `config.json` and `preprocessor_config.json`."
+
+        assert self.config.query_num == processor.image_processor.image_feature_size
+        assert self.config.patch_size == processor.image_processor.patch_size
+        assert self.config.use_image_id == processor.image_processor.use_image_id
+        assert self.config.slice_config.max_slice_nums == processor.image_processor.max_slice_nums
+        assert self.config.slice_mode == processor.image_processor.slice_mode
 
         prompts_lists = []
         input_images_lists = []
-        # 添加基因序列到输入列表
-        input_gene_sequences_lists = [] 
-        
+        input_gene_sequences_lists = []
+
         for image, gene_seq, msgs in zip(images_list, gene_sequences_list, msgs_list):
             if isinstance(msgs, str):
                 msgs = json.loads(msgs)
             copy_msgs = deepcopy(msgs)
-            print(f"[DEBUG] msgs is : {copy_msgs}")
-            print(f"[DEBUG] images is : {image}")
-            print(f"[DEBUG] gene_seq is : {gene_seq}")
 
             assert len(msgs) > 0, "msgs is empty"
             assert sampling or not stream, "if use stream mode, make sure sampling=True"
 
-            # if image is not None and isinstance(copy_msgs[0]["content"], str):
-            #     copy_msgs[0]["content"] = [image, copy_msgs[0]["content"]]
-            # if gene_seq is not None and isinstance(copy_msgs[0]["content"], str):
-            #     copy_msgs[0]["content"] = [gene_seq, copy_msgs[0]["content"]]
             content_raw = copy_msgs[0]["content"]
             new_content = []
             if image is not None:
@@ -451,8 +532,6 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
             elif isinstance(content_raw, list):
                 new_content.extend(content_raw)
             copy_msgs[0]["content"] = new_content
-                
-            print(f"[DEBUG] 三模态对齐输入 : {copy_msgs}")                                   
 
             images_in_msg = []
             gene_in_msg = []
@@ -464,7 +543,7 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
                     assert role == "user", "The role of first msg should be user"
                 if not isinstance(content, list):
                     content = [content]
-        
+
                 cur_msgs = []
                 for c in content:
                     if isinstance(c, Image.Image):
@@ -478,36 +557,28 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
                     else:
                         raise TypeError(f"Unsupported content type: {type(c)}")
 
-                # 最终把列表拼成字符串
                 msg["content"] = "\n".join(cur_msgs)
 
             if system_prompt:
                 sys_msg = {'role': 'system', 'content': system_prompt}
-                copy_msgs = [sys_msg] + copy_msgs        
-            print(f"[DEBUG] 处理后copy_msgs : {copy_msgs}")
-            
-            prompts_lists.append(processor.tokenizer.apply_chat_template(copy_msgs, tokenize=False, add_generation_prompt=True))
-            input_images_lists.append(images_in_msg)
-            input_gene_sequences_lists.append(gene_in_msg) # 收集基因序列
-            print(f"[DEBUG] 成功输入prompts_lists : {prompts_lists}")
-            print(f"[DEBUG] 成功输入images_lists : {input_images_lists}")
-            print(f"[DEBUG] 成功输入gene_lists : {input_gene_sequences_lists}")
+                copy_msgs = [sys_msg] + copy_msgs
 
-        # 改造 processor，使其能够处理基因数据
+            prompts_lists.append(
+                processor.tokenizer.apply_chat_template(copy_msgs, tokenize=False, add_generation_prompt=True)
+            )
+            input_images_lists.append(images_in_msg)
+            input_gene_sequences_lists.append(gene_in_msg)
+
         inputs = processor(
-            prompts_lists, 
-            input_images_lists, 
-            input_gene_sequences_lists, # 接受新参数
+            prompts_lists,
+            input_images_lists,
+            input_gene_sequences_lists,
             max_slice_nums=max_slice_nums,
             use_image_id=use_image_id,
-            return_tensors="pt", 
+            return_tensors="pt",
             max_length=max_inp_length
         ).to(self.device)
 
-        print("[DEBUG] inputs 所包含的键:", inputs.keys())
-        print("[DEBUG] inputs.processor():", inputs)
-        
-        
         if sampling:
             generation_config = {
                 "top_p": 0.8,
@@ -521,16 +592,14 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
                 "num_beams": 3,
                 "repetition_penalty": 1.2,
             }
-            
+
         if min_new_tokens > 0:
             generation_config['min_new_tokens'] = min_new_tokens
 
-        generation_config.update(
-            (k, kwargs[k]) for k in generation_config.keys() & kwargs.keys()
-        )
+        generation_config.update((k, kwargs[k]) for k in generation_config.keys() & kwargs.keys())
 
         inputs.pop("image_sizes")
-        
+
         with torch.inference_mode():
             res = self.generate(
                 **inputs,
@@ -541,8 +610,7 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
                 decode_text=True,
                 **generation_config
             )
-        
-        
+
         if stream:
             def stream_gen():
                 for text in res:
@@ -550,7 +618,6 @@ class MiniCPMV(MiniCPMVPreTrainedModel):
                         text = text.replace(term, '')
                     yield text
             return stream_gen()
-
         else:
             if batched:
                 answer = res

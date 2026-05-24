@@ -1,131 +1,0 @@
-nohup: ignoring input
-W0925 23:58:01.906305 140375769003840 torch/distributed/run.py:779] 
-W0925 23:58:01.906305 140375769003840 torch/distributed/run.py:779] *****************************************
-W0925 23:58:01.906305 140375769003840 torch/distributed/run.py:779] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
-W0925 23:58:01.906305 140375769003840 torch/distributed/run.py:779] *****************************************
-[2025-09-25 23:58:03,856] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cuda (auto detect)
-[2025-09-25 23:58:03,856] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cuda (auto detect)
-[2025-09-25 23:58:04,819] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
-[2025-09-25 23:58:04,819] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
-/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/transformers/training_args.py:1525: FutureWarning: `evaluation_strategy` is deprecated and will be removed in version 4.46 of 🤗 Transformers. Use `eval_strategy` instead
-  warnings.warn(
-/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/transformers/training_args.py:1525: FutureWarning: `evaluation_strategy` is deprecated and will be removed in version 4.46 of 🤗 Transformers. Use `eval_strategy` instead
-  warnings.warn(
-[2025-09-25 23:58:05,756] [INFO] [comm.py:821:init_distributed] cdb=None
-[2025-09-25 23:58:05,757] [INFO] [comm.py:821:init_distributed] cdb=None
-[2025-09-25 23:58:05,757] [INFO] [comm.py:852:init_distributed] Initializing TorchBackend in DeepSpeed with backend nccl
-/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/transformers/models/auto/image_processing_auto.py:513: FutureWarning: The image_processor_class argument is deprecated and will be removed in v4.42. Please use `slow_image_processor_class`, or `fast_image_processor_class` instead
-  warnings.warn(
-/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/transformers/models/auto/image_processing_auto.py:513: FutureWarning: The image_processor_class argument is deprecated and will be removed in v4.42. Please use `slow_image_processor_class`, or `fast_image_processor_class` instead
-  warnings.warn(
-Loading checkpoint shards:   0%|          | 0/6 [00:00<?, ?it/s]Loading checkpoint shards:   0%|          | 0/6 [00:00<?, ?it/s]Loading checkpoint shards:  17%|█▋        | 1/6 [00:00<00:00,  5.31it/s]Loading checkpoint shards:  17%|█▋        | 1/6 [00:00<00:01,  4.43it/s]Loading checkpoint shards:  33%|███▎      | 2/6 [00:00<00:00,  5.26it/s]Loading checkpoint shards:  50%|█████     | 3/6 [00:00<00:00,  5.43it/s]Loading checkpoint shards:  33%|███▎      | 2/6 [00:00<00:00,  4.47it/s]Loading checkpoint shards:  50%|█████     | 3/6 [00:00<00:00,  4.98it/s]Loading checkpoint shards:  67%|██████▋   | 4/6 [00:00<00:00,  5.17it/s]Loading checkpoint shards:  83%|████████▎ | 5/6 [00:00<00:00,  5.50it/s]Loading checkpoint shards:  67%|██████▋   | 4/6 [00:00<00:00,  4.90it/s]Loading checkpoint shards: 100%|██████████| 6/6 [00:01<00:00,  5.56it/s]Loading checkpoint shards: 100%|██████████| 6/6 [00:01<00:00,  5.44it/s]
-Some weights of the model checkpoint at /data2/xiaoxinyu/project/model were not used when initializing MiniCPMV: ['classifier_head.bias', 'classifier_head.weight']
-- This IS expected if you are initializing MiniCPMV from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).
-- This IS NOT expected if you are initializing MiniCPMV from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).
-Loading checkpoint shards:  83%|████████▎ | 5/6 [00:00<00:00,  5.34it/s]Loading checkpoint shards: 100%|██████████| 6/6 [00:01<00:00,  5.48it/s]Loading checkpoint shards: 100%|██████████| 6/6 [00:01<00:00,  5.16it/s]
-Some weights of the model checkpoint at /data2/xiaoxinyu/project/model were not used when initializing MiniCPMV: ['classifier_head.bias', 'classifier_head.weight']
-- This IS expected if you are initializing MiniCPMV from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).
-- This IS NOT expected if you are initializing MiniCPMV from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).
-{'Total': 8147670256, 'Trainable': 8147670256}
-llm_type=qwen
-Loading data...
-/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/transformers/deepspeed.py:24: FutureWarning: transformers.deepspeed module is deprecated and will be removed in a future version. Please import deepspeed modules directly from transformers.integrations
-  warnings.warn(
-max_steps is given, it will override any value given in num_train_epochs
-/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/transformers/deepspeed.py:24: FutureWarning: transformers.deepspeed module is deprecated and will be removed in a future version. Please import deepspeed modules directly from transformers.integrations
-  warnings.warn(
-max_steps is given, it will override any value given in num_train_epochs
-Using /home/xiaoxinyu/.cache/torch_extensions/py310_cu121 as PyTorch extensions root...
-Using /home/xiaoxinyu/.cache/torch_extensions/py310_cu121 as PyTorch extensions root...
-Detected CUDA files, patching ldflags
-Emitting ninja build file /home/xiaoxinyu/.cache/torch_extensions/py310_cu121/fused_adam/build.ninja...
-/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/torch/utils/cpp_extension.py:1965: UserWarning: TORCH_CUDA_ARCH_LIST is not set, all archs for visible cards are included for compilation. 
-If this is not desired, please set os.environ['TORCH_CUDA_ARCH_LIST'].
-  warnings.warn(
-Building extension module fused_adam...
-Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
-ninja: no work to do.
-Loading extension module fused_adam...
-Time to load fused_adam op: 0.018501996994018555 seconds
-Loading extension module fused_adam...
-Time to load fused_adam op: 0.1010892391204834 seconds
-[rank0]: Traceback (most recent call last):
-[rank0]:   File "/data2/xiaoxinyu/project/finetune/finetune.py", line 302, in <module>
-[rank0]:     train()
-[rank0]:   File "/data2/xiaoxinyu/project/finetune/finetune.py", line 292, in train
-[rank0]:     trainer.train()
-[rank0]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/transformers/trainer.py", line 1948, in train
-[rank0]:     return inner_training_loop(
-[rank0]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/transformers/trainer.py", line 2108, in _inner_training_loop
-[rank0]:     model, self.optimizer, self.lr_scheduler = self.accelerator.prepare(
-[rank0]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/accelerate/accelerator.py", line 1547, in prepare
-[rank0]:     result = self._prepare_deepspeed(*args)
-[rank0]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/accelerate/accelerator.py", line 2290, in _prepare_deepspeed
-[rank0]:     engine, optimizer, _, lr_scheduler = ds_initialize(**kwargs)
-[rank0]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/deepspeed/__init__.py", line 193, in initialize
-[rank0]:     engine = DeepSpeedEngine(args=args,
-[rank0]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/deepspeed/runtime/engine.py", line 345, in __init__
-[rank0]:     self._configure_optimizer(optimizer, model_parameters)
-[rank0]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/deepspeed/runtime/engine.py", line 1460, in _configure_optimizer
-[rank0]:     self.optimizer = self._configure_zero_optimizer(basic_optimizer)
-[rank0]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/deepspeed/runtime/engine.py", line 1736, in _configure_zero_optimizer
-[rank0]:     optimizer = Stage1And2ZeroOptimizer(
-[rank0]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/deepspeed/runtime/zero/stage_1_and_2.py", line 435, in __init__
-[rank0]:     self.device).clone().float().detach()
-[rank0]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 15.18 GiB. GPU 0 has a total capacity of 39.56 GiB of which 14.74 GiB is free. Including non-PyTorch memory, this process has 24.81 GiB memory in use. Of the allocated memory 23.24 GiB is allocated by PyTorch, and 233.80 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
-[rank1]: Traceback (most recent call last):
-[rank1]:   File "/data2/xiaoxinyu/project/finetune/finetune.py", line 302, in <module>
-[rank1]:     train()
-[rank1]:   File "/data2/xiaoxinyu/project/finetune/finetune.py", line 292, in train
-[rank1]:     trainer.train()
-[rank1]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/transformers/trainer.py", line 1948, in train
-[rank1]:     return inner_training_loop(
-[rank1]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/transformers/trainer.py", line 2108, in _inner_training_loop
-[rank1]:     model, self.optimizer, self.lr_scheduler = self.accelerator.prepare(
-[rank1]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/accelerate/accelerator.py", line 1547, in prepare
-[rank1]:     result = self._prepare_deepspeed(*args)
-[rank1]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/accelerate/accelerator.py", line 2290, in _prepare_deepspeed
-[rank1]:     engine, optimizer, _, lr_scheduler = ds_initialize(**kwargs)
-[rank1]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/deepspeed/__init__.py", line 193, in initialize
-[rank1]:     engine = DeepSpeedEngine(args=args,
-[rank1]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/deepspeed/runtime/engine.py", line 345, in __init__
-[rank1]:     self._configure_optimizer(optimizer, model_parameters)
-[rank1]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/deepspeed/runtime/engine.py", line 1460, in _configure_optimizer
-[rank1]:     self.optimizer = self._configure_zero_optimizer(basic_optimizer)
-[rank1]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/deepspeed/runtime/engine.py", line 1736, in _configure_zero_optimizer
-[rank1]:     optimizer = Stage1And2ZeroOptimizer(
-[rank1]:   File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/deepspeed/runtime/zero/stage_1_and_2.py", line 435, in __init__
-[rank1]:     self.device).clone().float().detach()
-[rank1]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 15.18 GiB. GPU 1 has a total capacity of 39.56 GiB of which 14.33 GiB is free. Including non-PyTorch memory, this process has 24.81 GiB memory in use. Of the allocated memory 23.24 GiB is allocated by PyTorch, and 233.80 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
-[rank0]:[W925 23:58:34.909883351 ProcessGroupNCCL.cpp:1168] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
-W0925 23:58:35.264036 140375769003840 torch/distributed/elastic/multiprocessing/api.py:858] Sending process 1978011 closing signal SIGTERM
-E0925 23:58:35.382079 140375769003840 torch/distributed/elastic/multiprocessing/api.py:833] failed (exitcode: 1) local_rank: 0 (pid: 1978010) of binary: /home/xiaoxinyu/miniconda3/envs/minicpm-v26/bin/python3.10
-Traceback (most recent call last):
-  File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/bin/torchrun", line 8, in <module>
-    sys.exit(main())
-  File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 348, in wrapper
-    return f(*args, **kwargs)
-  File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/torch/distributed/run.py", line 901, in main
-    run(args)
-  File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/torch/distributed/run.py", line 892, in run
-    elastic_launch(
-  File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 133, in __call__
-    return launch_agent(self._config, self._entrypoint, list(args))
-  File "/home/xiaoxinyu/miniconda3/envs/minicpm-v26/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 264, in launch_agent
-    raise ChildFailedError(
-torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
-============================================================
-finetune.py FAILED
-------------------------------------------------------------
-Failures:
-  <NO_OTHER_FAILURES>
-------------------------------------------------------------
-Root Cause (first observed failure):
-[0]:
-  time      : 2025-09-25_23:58:35
-  host      : pm-44e80010
-  rank      : 0 (local_rank: 0)
-  exitcode  : 1 (pid: 1978010)
-  error_file: <N/A>
-  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
-============================================================
