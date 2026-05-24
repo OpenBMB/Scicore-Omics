@@ -1,8 +1,7 @@
 # SciCore-Omics
 
-SciCore-Omics is a gene-aware multimodal modeling project built around the MiniCPM-V stack. The central goal of the repository is to make transcriptomic signals usable alongside natural language and tissue imagery within a single instruction-following model. In practice, this repository extends the MiniCPM-V architecture with a dedicated gene branch, provides training code for aligning that branch to the language model, and includes downstream fine-tuning and baseline evaluation pipelines for gene-centric spatial transcriptomics tasks.
+SciCore-Omics is a gene-aware multimodal modeling project built around the MiniCPM-V2.6 stack. The central goal of the repository is to make transcriptomic signals usable alongside natural language and tissue imagery within a single instruction-following model. In practice, this repository extends the MiniCPM-V architecture with a dedicated gene branch, provides training code for aligning that branch to the language model, and includes downstream fine-tuning and baseline evaluation pipelines for gene-centric spatial transcriptomics tasks.
 
-This is research code rather than a polished library release. The repository contains both core model definitions and experiment-oriented training scripts, with some components already cleaned for GitHub-facing use and others still reflecting lab-local workflow assumptions.
 
 ## Core Idea
 
@@ -41,7 +40,7 @@ The project is organized around four main code areas:
 | `finetune-gene/` | Earlier Hugging Face `Trainer` + DeepSpeed fine-tuning pipeline for multimodal gene experiments. |
 | `qformer/` | Gene bridge distillation utilities for training `gene_qformer` and `gene_projector`, plus weight injection into a full model directory. |
 | `pretrain-gene/` | Cleaner GitHub-facing training, inference, and baseline evaluation scripts, including C2S and CellWhisperer comparisons. |
-| `src/` | Additional project code and earlier utilities. It exists in the repository but is not the main focus of this README. |
+| `src/` | TODO |
 | `environment.yml` | Conda environment specification for the research stack. |
 
 If you are new to the codebase, the most useful reading order is:
