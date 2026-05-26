@@ -6,7 +6,7 @@ SciCore-Omics is a gene-aware multimodal framework for joint reasoning over hist
 
 ## Key Contributions
 
-- **Gene-aware multimodal MiniCPM-V.** SciCore-Omics extends MiniCPM-V from image-text modeling to gene-image-text reasoning with an explicit transcriptomic input pathway.
+- **Gene-aware tri-modal foundation model.** SciCore-Omics extends MiniCPM-V from image-text modeling to gene-image-text reasoning with an explicit transcriptomic input pathway.
 - **Dedicated gene representation bridge.** The gene branch uses Nicheformer, a Gene Q-Former, and a Gene Projector to transform variable-length gene-expression signals into fixed-length LLM-compatible embeddings.
 - **Staged training pipeline.** The repository provides gene bridge distillation, Swift-based CPT/SFT, and GSPO/PPO-style RL refinement as separate training stages.
 - **Practical release path.** The project includes a live demo, reproducible training entrypoints, and placeholders for future Hugging Face model release.
