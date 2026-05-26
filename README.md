@@ -1,7 +1,15 @@
 # SciCore-Omics
 
-SciCore-Omics is a gene-aware multimodal modeling project built around the MiniCPM-V stack. The central goal of the repository is to make transcriptomic signals usable alongside natural language and tissue imagery within a single instruction-following model. In practice, this repository extends the MiniCPM-V architecture with a dedicated gene branch, provides training code for aligning that branch to the language model, and includes downstream fine-tuning and baseline evaluation pipelines for gene-centric spatial transcriptomics tasks.
+Gene-aware multimodal foundation modeling for spatial omics and pathology reasoning.
 
+SciCore-Omics is a gene-aware multimodal framework for joint reasoning over histology images, natural language, and transcriptomic profiles. Built on the MiniCPM-V stack, it introduces a dedicated gene branch that encodes expression profiles with Nicheformer, compresses gene representations through a Gene Q-Former, and injects the resulting embeddings into the language-model token space. The project is designed for spatial omics and pathology scenarios where molecular signals and visual morphology should be interpreted together rather than handled as isolated modalities.
+
+## Key Contributions
+
+- **Gene-aware multimodal MiniCPM-V.** SciCore-Omics extends MiniCPM-V from image-text modeling to gene-image-text reasoning with an explicit transcriptomic input pathway.
+- **Dedicated gene representation bridge.** The gene branch uses Nicheformer, a Gene Q-Former, and a Gene Projector to transform variable-length gene-expression signals into fixed-length LLM-compatible embeddings.
+- **Staged training pipeline.** The repository provides gene bridge distillation, Swift-based CPT/SFT, and GSPO/PPO-style RL refinement as separate training stages.
+- **Practical release path.** The project includes a live demo, reproducible training entrypoints, and placeholders for future Hugging Face model release.
 
 ## Core Idea
 
@@ -28,7 +36,7 @@ all modalities
   -> MiniCPM-V / Qwen2 language model
 ```
 
-This design allows the model to consume transcriptomic context either alone or together with histology images and text instructions, while preserving the standard autoregressive language-model interface.
+This design allows the model to consume transcriptomic context either alone or together with histology images and text instructions, while preserving the standard autoregressive language-model interface. The gene signal is not merely converted into plain text; it is encoded as multimodal embeddings and inserted into the LLM token embedding sequence.
 
 ## What Is In This Repository
 
@@ -37,15 +45,15 @@ The project is organized around four main code areas:
 | Path | Role |
 | --- | --- |
 | `model/` | Core model and processor definitions for the gene-aware MiniCPM-V variant. |
-| `train-distrill-gene/` | Gene bridge distillation utilities for training `gene_qformer` and `gene_projector`, plus weight injection into a full model directory. |
-| `train-swift-cpt-sft/` | Swift-based CPT/SFT example scripts and custom registration for gene-aware MiniCPM-V workflows. |
-| `train-rl/` | GSPO-style reinforcement learning pipeline for preference or score-guided multimodal optimization. |
+| `train-distill-gene/` | Gene bridge distillation utilities for training `gene_qformer` and `gene_projector`, plus weight injection into a full model directory. |
+| `train-swift-cpt-sft/` | `ms-swift` based CPT/SFT example scripts and custom registration for gene-aware MiniCPM-V workflows. |
+| `train-rl/` | GSPO/PPO-style score-guided reinforcement learning pipeline for multimodal optimization. |
 | `environment.yml` | Conda environment specification for the research stack. |
 
 If you are new to the codebase, the most useful reading order is:
 
 1. `model/`
-2. `train-distrill-gene/`
+2. `train-distill-gene/`
 3. `train-swift-cpt-sft/`
 4. `train-rl/`
 
@@ -70,9 +78,14 @@ If you are new to the codebase, the most useful reading order is:
 
    The reference environment was developed on Linux with NVIDIA A800-SXM4-80GB GPUs. The `flash-attn` package can be sensitive to the local CUDA, PyTorch, and GPU setup, so it may need to be adjusted for a different machine.
 
-3. Hugging Face release
+3. Release status
 
-   TODO: add the public Hugging Face model and checkpoint links once the repository is officially open-sourced.
+   | Item | Status |
+   | --- | --- |
+   | Demo | Available |
+   | Training code | Available |
+   | Model weights | TODO |
+   | Hugging Face | TODO |
 
 ## Model Architecture
 
@@ -87,7 +100,7 @@ The heart of the repository lives in `model/`, where the multimodal model is def
 | `model/modeling_nicheformer.py` | Implements `NicheformerModel`, a transformer encoder over gene tokens. |
 | `model/gene_qformer_module.py` | Implements `GeneQFormerBiomedBERT`, a learnable-query bridge that compresses variable-length gene token sequences into a fixed set of query tokens. |
 | `model/gene_projector_module.py` | Projects Q-Former outputs from the bridge hidden size into the language-model embedding dimension. |
-| `model/modeling_minicpmv.py` | Integrates the LLM, vision tower, resampler, Nicheformer, gene Q-Former, and gene projector into one multimodal model. |
+| `model/modeling_minicpmv.py` | Integrates the LLM, vision tower, resampler, Nicheformer, Gene Q-Former, and Gene Projector into one multimodal model. |
 | `model/processing_minicpmv.py` | Implements the processor that packages text, image, and gene inputs into model-ready tensors. |
 | `model/gene_tokenizer/` | Gene-tokenization resources, tokenizer logic, vocabulary, and reference `.h5ad` assets used by the processor and training scripts. |
 
@@ -103,15 +116,17 @@ At a high level, the repository uses the following sequence:
 
 The multimodal merge happens inside the MiniCPM-V modeling logic, where image features and gene features are both converted into embedding spans and then scattered into the final `inputs_embeds` sequence before language-model forward or generation.
 
-## Training Workflows
+## Training Pipeline
 
-### 1. Gene bridge distillation with `train-distrill-gene/`
+SciCore-Omics uses a staged training design rather than a single monolithic training script. Gene bridge distillation first aligns transcriptomic representations with the language-model space; Swift-based CPT/SFT then adapts the multimodal model to instruction-following data; RL refinement further optimizes selected modules with score-guided rollouts.
 
-The `train-distrill-gene/` directory isolates training for the gene bridge modules:
+### 1. Gene bridge distillation with `train-distill-gene/`
+
+The `train-distill-gene/` directory isolates training for the gene bridge modules:
 
 - `gene_qformer`
 - `gene_projector`
-- optionally an auxiliary classification head in the more complete training path
+- optionally `gene_cls_head` in the more complete training path
 
 This stage is useful when the core multimodal model already exists but the gene branch needs better alignment with the language-model representation space.
 
@@ -119,11 +134,11 @@ There are three main scripts:
 
 | File | Purpose |
 | --- | --- |
-| `train-distrill-gene/train_gene_bridge_distill.py` | Simplest single-GPU bridge distillation. |
-| `train-distrill-gene/train_gene_bridge_distill_ddp.py` | Distributed version with cross-rank negatives. |
-| `train-distrill-gene/train_gene_bridge_distill_real_processor.py` | Preferred current training path using the real processor and reference-gene alignment. |
+| `train-distill-gene/train_gene_bridge_distill.py` | Simplest single-GPU bridge distillation. |
+| `train-distill-gene/train_gene_bridge_distill_ddp.py` | Distributed version with cross-rank negatives. |
+| `train-distill-gene/train_gene_bridge_distill_real_processor.py` | Preferred current training path using the real processor and reference-gene alignment. |
 
-After distillation, `train-distrill-gene/inject_gene_bridge_weights.py` copies the trained bridge weights into a full sharded model directory.
+After distillation, `train-distill-gene/inject_gene_bridge_weights.py` copies the trained bridge weights into a full sharded model directory.
 
 ### 2. CPT/SFT training with `train-swift-cpt-sft/`
 
@@ -147,19 +162,16 @@ This register file defines the `minicpm_v2_6_gene` model/template path for Swift
 | File / Folder | Purpose |
 | --- | --- |
 | `train-swift-cpt-sft/register/my_register_qformer.py` | Swift custom register file for the gene-aware MiniCPM-V + Q-Former model. |
-| `train-swift-cpt-sft/script/cpt-example.sh` | Example CPT/continued-training launcher using `swift sft` with the custom register path. |
-| `train-swift-cpt-sft/script/sft-example.sh` | Example SFT launcher using `swift sft`, LoRA, gene/Q-Former target modules, and the custom register path. |
+| `train-swift-cpt-sft/script/cpt-example.sh` | Example continued-training launcher using the custom register path. |
+| `train-swift-cpt-sft/script/sft-example.sh` | Example SFT launcher using LoRA, gene/Q-Former target modules, and the custom register path. |
 
-### 3. RL training with `train-rl/`
+### 3. RL refinement with `train-rl/`
 
-The `train-rl/` directory contains a GSPO-style reinforcement learning pipeline for score-guided multimodal optimization. It separates rollout preparation, reference-model scoring, and distributed actor updates:
+The `train-rl/` directory contains a GSPO/PPO-style reinforcement learning pipeline for score-guided multimodal optimization. It separates rollout preparation, reference-model scoring, and distributed actor updates:
 
 - `gen_worker.py` samples examples, builds candidate batches with `GSPODataset`, expands single-token `<gene>` placeholders into 32-token gene spans when needed, computes old-policy token log probabilities for fixed outputs, and uploads packed rollouts.
 - `ref_server.py` runs a Flask reference server, restores packed image/gene/text tensors, computes reference-model token log probabilities, and queues batches for training.
 - `finetune_gspo.py` runs the DDP training loop, pulls rollout batches from the reference server, dynamically enables trainable parameter groups according to modality, and optimizes a clipped GSPO/PPO-style objective with a KL penalty.
-- `dataset.py` provides supervised and GSPO datasets for text, image, and gene samples.
-- `gene_tokenizer.py` provides the gene tokenizer used by the RL data pipeline.
-- `run_gspo.sh` launches the full workflow, including reference server, generation worker, distributed training, logging, and checkpoint output.
 
 The RL script freezes the full model by default and selectively trains the gene bridge, image resampler, and final LLM layer depending on whether the current rollout contains gene and/or image inputs.
 
@@ -168,6 +180,6 @@ The RL script freezes the full model by default and selectively trains the gene 
 If your goal is:
 
 - understand the architecture: start with `model/`
-- train or improve the gene bridge: start with `train-distrill-gene/`
-- run the cleaned CPT/SFT and downstream training scripts: start with `train-swift-cpt-sft/`
+- align or improve the gene bridge: start with `train-distill-gene/`
+- run CPT/SFT with Swift custom registration: start with `train-swift-cpt-sft/`
 - run score-guided RL optimization: start with `train-rl/`
