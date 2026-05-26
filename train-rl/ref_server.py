@@ -363,7 +363,7 @@ def init_ref_model():
     ref_model.eval()
 
     gene_tokenizer = GeneTokenizer(
-        vocab_file="/data2/xiaoxinyu/project/model/gene_tokenizer/vocab.json"
+        vocab_file="/model/gene_tokenizer/vocab.json"
     )
     print("[REF_SERVER] Reference model loaded!")
 

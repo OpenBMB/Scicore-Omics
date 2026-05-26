@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="/data2/xiaoxinyu/RL/ref_version_v2"
+ROOT="."
 cd "$ROOT"
 
 LOG_DIR="$ROOT/logs"
 CKPT_DIR="$ROOT/checkpoints"
 mkdir -p "$LOG_DIR" "$CKPT_DIR"
 
-MODEL_PATH="/data2/xiaoxinyu/project/model_cpt_v5_qformer"
-EXAMPLE_JSON="$ROOT/example.json"
-# EXAMPLE_JSON="/data2/xiaoxinyu/RL/data/pathvqa_open_modelneg_test5.json"
-GENE_VOCAB_FILE="/data2/xiaoxinyu/project/model/gene_tokenizer/vocab.json"
+MODEL_PATH="/model"
+EXAMPLE_JSON="YOUR_EXAMPLE.json"
+GENE_VOCAB_FILE="model/gene_tokenizer/vocab.json"
 
-PYTHON_BIN="/home/xiaoxinyu/miniconda3/envs/pt/bin/python"
+PYTHON_BIN="YOUR_PYTHON_BIN"  
 
 # ===== GPU 配置 =====
 # 推荐：train / gen_worker / ref_server 不要重叠

@@ -1,23 +1,4 @@
-'''
-export CUDA_VISIBLE_DEVICES=0,1,2,3
-export NCCL_ASYNC_ERROR_HANDLING=1
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-torchrun --nproc_per_node 4 \
-  /data2/xiaoxinyu/project/qformer/train_gene_bridge_distill_real_processor.py \
-  --model_path /data2/xiaoxinyu/project/model_cpt_v7_qformer \
-  --data_jsonl /data2/xiaoxinyu/project/new_data/gene_data.jsonl \
-  --out_dir /data2/xiaoxinyu/project/qformer/distill_out_cpt_v7_real_processor \
-  --epochs 1 \
-  --batch_size 2 \
-  --lr 1e-4 \
-  --lambda_ce 0.2 \
-  --lambda_cos 1.0 \
-  --lambda_nce 1.0 \
-  --lambda_cls 0.5 \
-  --temp 0.07 \
-  --save_step 500
-  '''
 
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -169,7 +150,7 @@ def extract_label_from_sample(sample: Dict[str, Any]) -> Tuple[Optional[int], bo
     # -------------------------
     # 1) DLPFC: 从文本中提取脑区层 label
     # -------------------------
-    if "/data2/xiaoxinyu/data/DLPFC/gene-h5ad/" in gene_path:
+    if "YOUR_GENE_PATH" in gene_path:
         for zh, en in LAYER_MAP_ZH2EN.items():
             if zh in assist_text:
                 return LABEL2ID[en], True
@@ -178,19 +159,19 @@ def extract_label_from_sample(sample: Dict[str, Any]) -> Tuple[Optional[int], bo
     # -------------------------
     # 2) STimage: 直接按路径给组织标签
     # -------------------------
-    if "/data2/xiaoxinyu/data/STimage-1K4M/process-data/ST/gene_h5ad/Human_Breast" in gene_path:
+    if "YOUR_GENE_PATH" in gene_path:
         return LABEL2ID["breast"], True
 
-    if "/data2/xiaoxinyu/data/STimage-1K4M/process-data/ST/gene_h5ad/GSE144239" in gene_path:
+    if "YOUR_GENE_PATH" in gene_path:
         return LABEL2ID["skin"], True
 
-    if "/data2/xiaoxinyu/data/STimage-1K4M/process-data/ST/gene_h5ad/Human_Heart" in gene_path:
+    if "YOUR_GENE_PATH" in gene_path:
         return LABEL2ID["heart"], True
 
     # -------------------------
     # 3) CellWhisperer: 不做分类监督
     # -------------------------
-    if "/data2/xiaoxinyu/data/cellwhisperer/one_cell_h5ad" in gene_path:
+    if "YOUR_GENE_PATH" in gene_path:
         return None, False
 
     return None, False
@@ -290,8 +271,7 @@ def pool_mean(x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
 
 def load_local_reference_var_names() -> List[str]:
     candidates = [
-        "/data2/xiaoxinyu/project/model/gene_tokenizer/model-symbel.h5ad",
-        "/data2/xiaoxinyu/project/model/gene_tokenizer/model-ensembl.h5ad",
+        "YOUR_GENE_PATH"
     ]
 
     for p in candidates:

@@ -1,19 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-固定 output 上传版 Worker（兼容有 gene / 无 gene）
-
-核心思路：
-1. 从 example.json 中采样样本
-2. 用 dataset.py 的 GSPODataset + gspo_data_collator 构造 candidate
-3. 如果存在 gene 且 gene_bound 是单 token 占位，则扩成 32-token span
-4. 不在线 generate；直接使用数据集中已有的 output（labels != -100 对应部分）
-5. 计算这条固定 output 的 token-level old-policy log probs
-6. reward 默认来自预处理好的 scores；可选叠加 structured reward
-7. 上传到 ref_server
-8. 打印 PROMPT / FIXED ANSWER / reward 调试信息
-"""
 
 import os
 import sys
@@ -85,7 +72,7 @@ def gen_worker(
     # GeneTokenizer 仅在有 gene 时才真正会用到
     gene_vocab_file = os.environ.get(
         "GENE_VOCAB_FILE",
-        "/data2/xiaoxinyu/project/model/gene_tokenizer/vocab.json"
+        "/model/gene_tokenizer/vocab.json"
     )
     gene_tokenizer = GeneTokenizer(vocab_file=gene_vocab_file)
 
@@ -664,8 +651,8 @@ if __name__ == "__main__":
     q = mp.Queue()
     gen_worker(
         q,
-        model_path="/data2/xiaoxinyu/project/model_cpt_v5_qformer",
-        example_json="/data2/xiaoxinyu/RL/data/pathvqa_open_modelneg_test5.json",
+        model_path="/model",
+        example_json="YOUR_EXAMPLE_JSON_PATH",
         ref_port=59875,
         physics_device=4,
         q_batch_size=1,

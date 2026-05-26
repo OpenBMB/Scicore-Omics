@@ -78,7 +78,7 @@ class MiniCPMGeneTemplate(Template):
 
     def init_processor(self, processor):
         super().init_processor(processor)
-        vocab_path = os.environ.get('GENE_VOCAB_PATH', '/data2/xiaoxinyu/project/model/gene_tokenizer/vocab.json')
+        vocab_path = os.environ.get('GENE_VOCAB_PATH', '/model/gene_tokenizer/vocab.json')
         try:
             self.gene_tokenizer = GeneTokenizer(vocab_path)
             logger.info(f"Using GeneTokenizer from: {vocab_path}")

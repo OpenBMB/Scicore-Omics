@@ -503,36 +503,3 @@ if __name__ == "__main__":
     main()
 
 
-'''
-export CUDA_VISIBLE_DEVICES=7
-python /data2/xiaoxinyu/project/qformer/train_gene_bridge_distill.py \
-  --model_path /data2/xiaoxinyu/project/model_cpt_v6_qformer \
-  --data_jsonl /data2/xiaoxinyu/project/new_data/gene_data.jsonl \
-  --gene_vocab /data2/xiaoxinyu/project/model/gene_tokenizer/vocab.json \
-  --out_dir /data2/xiaoxinyu/project/qformer/distill_out_cpt_v6 \
-  --epochs 1 \
-  --batch_size 16 \
-  --lr 1e-4 \
-  --lambda_ce 0.2 \
-  --lambda_cos 1.0 \
-  --lambda_nce 1.0 \
-  --temp 0.07 \
-  --save_step 100
-  
-  
-python /data2/xiaoxinyu/project/qformer/train_gene_bridge_distill.py \
-  --model_path /data2/xiaoxinyu/project/model_merged_v75_qformer \
-  --data_jsonl /data2/xiaoxinyu/project/new_data/sft_STimage_gene_only.jsonl \
-  --gene_vocab /data2/xiaoxinyu/project/model/gene_tokenizer/vocab.json \
-  --out_dir /data2/xiaoxinyu/project/qformer/distill_out_cpt_v1 \
-  --epochs 1 \
-  --batch_size 8 \
-  --lr 1e-4 \
-  --lambda_ce 0.2 \
-  --lambda_cos 1.0 \
-  --lambda_nce 1.0 \
-  --temp 0.07 \
-  --save_step 400
-  
-  
-'''

@@ -19,9 +19,9 @@ def main():
     # ============
     # Paths (EDIT)
     # ============
-    base_dir = "/data2/xiaoxinyu/project/model_cpt_v7_qformer"
-    step_ckpt = "/data2/xiaoxinyu/project/qformer/distill_out_cpt_v7_real_processor/gene_bridge_distill_real_processor_step1000.pt"
-    out_dir = "/data2/xiaoxinyu/project/model_cpt_v7_qformer_injected_step1000"  # new dir
+    base_dir = "YOUR_BASE_MODEL_DIR"
+    step_ckpt = "YOUR_DISTILL_CKPT"
+    out_dir = "YOUR_OUTPUT_PATH"  # new dir
 
     index_path = os.path.join(base_dir, "model.safetensors.index.json")
     assert os.path.exists(index_path), f"index not found: {index_path}"

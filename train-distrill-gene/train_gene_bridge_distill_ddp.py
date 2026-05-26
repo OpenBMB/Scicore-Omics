@@ -656,24 +656,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-'''
-export CUDA_VISIBLE_DEVICES=1,2,3,4,5,7
-export NCCL_ASYNC_ERROR_HANDLING=1
-export NCCL_BLOCKING_WAIT=1
-
-torchrun --nproc_per_node 6 \
-  /data2/xiaoxinyu/project/qformer/train_gene_bridge_distill_ddp.py \
-  --model_path /data2/xiaoxinyu/project/model_cpt_v3_qformer \
-  --data_jsonl /data2/xiaoxinyu/project/new_data/sft_STimage_gene_only.jsonl \
-  --gene_vocab /data2/xiaoxinyu/project/model/gene_tokenizer/vocab.json \
-  --out_dir /data2/xiaoxinyu/project/qformer/distill_out_ddp \
-  --epochs 1 \
-  --batch_size 8 \
-  --lr 1e-4 \
-  --lambda_ce 0.1 \
-  --lambda_cos 0.5 \
-  --lambda_nce 1.0 \
-  --temp 0.2 \
-  --log_every 200
-'''
