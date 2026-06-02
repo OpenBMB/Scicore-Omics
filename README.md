@@ -1,8 +1,12 @@
-# SciCore-Omics
+<img width="1927" height="1038" alt="fig1" src="https://github.com/user-attachments/assets/e855de29-3ebe-4d82-b48f-b06d9dd93634" /># SciCore-Omics
 
 Gene-aware multimodal foundation modeling for spatial omics and pathology reasoning.
 
 SciCore-Omics is a gene-aware multimodal framework for joint reasoning over histology images, natural language, and transcriptomic profiles. Built on the MiniCPM-V stack, it introduces a dedicated gene branch that encodes expression profiles with Nicheformer, compresses gene representations through a Gene Q-Former, and injects the resulting embeddings into the language-model token space. The project is designed for spatial omics and pathology scenarios where molecular signals and visual morphology should be interpreted together rather than handled as isolated modalities.
+
+<img width="1927" height="1038" alt="fig1" src="https://github.com/user-attachments/assets/4fcb00c5-b514-4303-ac59-7c9139855299" />
+<img width="1597" height="395" alt="edfig1" src="https://github.com/user-attachments/assets/91b44e26-4b9f-46f6-841e-44d97c146782" />
+
 
 ## Key Contributions
 
