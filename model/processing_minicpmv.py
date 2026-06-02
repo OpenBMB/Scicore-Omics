@@ -47,8 +47,8 @@ class MiniCPMVProcessor(ProcessorMixin):
         # tokenizer_dir = os.path.join(BASE_DIR, "gene_tokenizer")
         # self.gene_tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, trust_remote_code=True)
         # technology_mean_path = os.path.join(tokenizer_dir, "xenium_mean_script.npy")
-        self.gene_tokenizer = AutoTokenizer.from_pretrained("/data2/xiaoxinyu/project/model/gene_tokenizer", trust_remote_code=True)
-        technology_mean_path = '/data2/xiaoxinyu/project/model/gene_tokenizer/xenium_mean_script.npy'
+        self.gene_tokenizer = AutoTokenizer.from_pretrained("your/path/to/gene_tokenizer", trust_remote_code=True)
+        technology_mean_path = 'your/path/to/gene_tokenizer/xenium_mean_script.npy'
         technology_mean = np.load(technology_mean_path)
         self.gene_tokenizer._load_technology_mean(technology_mean)
 
