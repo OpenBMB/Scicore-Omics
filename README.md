@@ -1,4 +1,4 @@
-<img width="1927" height="1038" alt="fig1" src="https://github.com/user-attachments/assets/e855de29-3ebe-4d82-b48f-b06d9dd93634" /># SciCore-Omics
+# SciCore-Omics
 
 Gene-aware multimodal foundation modeling for spatial omics and pathology reasoning.
 
