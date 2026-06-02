@@ -299,37 +299,6 @@ The minimum GPU memory required for inference depends on image resolution, gene-
 
 ---
 
-## Core Idea
-
-SciCore-Omics augments a MiniCPM-V-style vision-language model with a transcriptomic pathway:
-
-```text
-gene expression (.h5ad)
-  -> gene tokenizer
-  -> NicheFormer gene encoder
-  -> Gene Q-Former
-  -> Gene Projector
-  -> <gene> span embeddings in the LLM token space
-
-histology image
-  -> vision tower
-  -> image resampler
-  -> <image> span embeddings in the LLM token space
-
-text prompt
-  -> tokenizer
-  -> text embeddings
-
-all modalities
-  -> merged input embeddings
-  -> autoregressive language model
-  -> biological natural-language response
-```
-
-The transcriptomic signal is not simply converted into plain text. Instead, it is encoded as dense multimodal embeddings and injected into the LLM token sequence. This allows the model to reason over molecular and morphological information within a unified language-generation interface.
-
----
-
 ## Model Architecture
 
 The core implementation lives in `model/`.
@@ -344,28 +313,6 @@ The core implementation lives in `model/`.
 | `model/modeling_minicpmv.py`         | Integrates the LLM, vision tower, resampler, NicheFormer, Gene Q-Former, and Gene Projector. |
 | `model/processing_minicpmv.py`       | Implements the processor that packages text, image, and gene inputs.                         |
 | `model/gene_tokenizer/`              | Contains gene-tokenization resources, vocabulary, and reference assets.                      |
-
-### Gene Branch
-
-The gene branch follows five main steps:
-
-1. Gene expression is tokenized into a gene-token sequence.
-2. `NicheFormerModel` encodes the sequence into contextual gene embeddings.
-3. `GeneQFormerBiomedBERT` compresses variable-length gene embeddings into a fixed number of query tokens.
-4. `GeneProjector` maps query outputs into the LLM hidden space.
-5. The projected gene embeddings are inserted into the LLM input embedding stream at the gene placeholder span.
-
-### Image Branch
-
-The image branch follows the MiniCPM-V-style visual encoding path:
-
-1. Histology images are processed by the vision tower.
-2. Visual features are compressed through the image resampler.
-3. The resulting image embeddings are inserted into the LLM input sequence at the image placeholder span.
-
-### Language Interface
-
-After image and gene features are projected into the LLM hidden space, SciCore-Omics keeps the standard autoregressive language-model interface. This makes it possible to use natural-language prompts for biological reasoning, question answering, and description generation.
 
 ---
 
