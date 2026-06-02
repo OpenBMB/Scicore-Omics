@@ -65,7 +65,7 @@ If you are new to the codebase, the most useful reading order is:
 
    A live demo is available here:
 
-   [http://166.111.5.103:15557/](http://166.111.5.103:15557/)
+   | Hugging Face | [SciCore-Omics Space](https://huggingface.co/spaces/Alkaidxxy/SciCore-Omics) |
 
    This is the quickest way to inspect the current behavior while public weights are not yet released.
 
@@ -87,7 +87,7 @@ If you are new to the codebase, the most useful reading order is:
    | Demo | Available |
    | Training code | Available |
    | Model weights | TODO |
-| Hugging Face | [SciCore-Omics Space](https://huggingface.co/spaces/Alkaidxxy/SciCore-Omics) |
+
 
 ## Model Architecture
 
