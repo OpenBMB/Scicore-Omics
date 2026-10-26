@@ -28,9 +28,9 @@ def plot_compact():
     )
     x = [0, 1, 2]
     series = [
-        ('BLEU-4', [0.024, 0.641, 0.791], '#1F77B4', 'o'),
-        ('ROUGE-L', [0.022, 0.177, 0.606], '#FF7F0E', 's'),
-        ('BERTScore', [0.346, 0.585, 0.831], '#2CA02C', '^'),
+        ('BLEU-4', [0.0144, 0.2186, 0.5246], '#1F77B4', 'o'),
+        ('ROUGE-L', [0.0221, 0.3113, 0.6129], '#FF7F0E', 's'),
+        ('BERTScore', [0.3462, 0.5743, 0.8929], '#2CA02C', '^'),
     ]
     for name, values, color, marker in series:
         top.plot(x, values, label=name, color=color, marker=marker,
