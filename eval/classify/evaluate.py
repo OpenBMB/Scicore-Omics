@@ -1,78 +1,135 @@
-
-"""Zero-shot image classification with SciCore-Omics.
-
-Input CSV columns: image, label. Labels must match one of --classes.
-Paths in the image column are relative to --image-root unless absolute.
-"""
+"""Run SciCore pathology benchmark inference on a prepared image manifest."""
 import argparse
 import csv
 import json
 import re
 from pathlib import Path
 
-
-def parse_prediction(response, classes):
-    text = str(response).strip().casefold()
-    text = re.sub(r"^(answer|label)\s*[:：]\s*", "", text).strip(" .,:;\n")
-    matches = [label for label in classes if text == label.casefold()]
-    return matches[0] if len(matches) == 1 else None
+from benchmarks import BENCHMARKS
 
 
-def evaluate(rows, predict, classes):
-    results = []
+def parse_prediction(benchmark, output):
+    text = str(output or "").strip().lower()
+    labels = BENCHMARKS[benchmark].labels
+    number = re.search(r"\b([0-9])\b", text)
+    if number and int(number.group(1)) < len(labels):
+        return int(number.group(1))
+    if benchmark == "pcam":
+        return 1 if "1" in text else 0
+    if benchmark == "mhist":
+        if any(term in text for term in ("sessile serrated", "ssa")):
+            return 1
+        if any(term in text for term in ("hyperplastic", "hp")):
+            return 0
+        return None
+    if benchmark == "crc_val_he_7k":
+        for index, code in enumerate(labels):
+            if re.search(rf"\b{re.escape(code.lower())}\b", text):
+                return index
+        return None
+    if benchmark.startswith("lc25000"):
+        if "adenocarcinoma" in text or "aca" in text:
+            return 0
+        if benchmark == "lc25000_lung" and ("squamous" in text or "scc" in text):
+            return 1
+        if any(term in text for term in ("benign", "normal", "non-malignant")):
+            return 2 if benchmark == "lc25000_lung" else 1
+    for index, label in enumerate(labels):
+        if label in text:
+            return index
+    if benchmark == "bach_official_400":
+        if "in situ" in text or "in-situ" in text or "insitu" in text:
+            return 2
+        if "invasive" in text:
+            return 3
+    return None
+
+
+def metrics(records, labels):
+    total = len(records)
+    parsed = [row for row in records if row["prediction"] is not None]
+    correct = sum(row["prediction"] == row["label"] for row in records)
+    confusion = [[0 for _ in labels] for _ in labels]
+    for row in parsed:
+        confusion[row["label"]][row["prediction"]] += 1
+    per_class = {}
+    for index, name in enumerate(labels):
+        tp = confusion[index][index]
+        fp = sum(confusion[row][index] for row in range(len(labels))) - tp
+        fn = sum(confusion[index]) - tp
+        precision = tp / (tp + fp) if tp + fp else 0.0
+        recall = tp / (tp + fn) if tp + fn else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        per_class[name] = {"precision": precision, "recall": recall, "f1": f1, "support": sum(confusion[index])}
+    return {"total": total, "parsed": len(parsed), "correct": correct,
+            "parse_rate": len(parsed) / total if total else 0.0,
+            "accuracy_overall": correct / total if total else 0.0,
+            "accuracy_parsed_only": correct / len(parsed) if parsed else 0.0,
+            "macro_f1": sum(item["f1"] for item in per_class.values()) / len(labels),
+            "per_class": per_class, "confusion_matrix_parsed_only": confusion}
+
+
+def evaluate(rows, benchmark, predict):
+    labels = BENCHMARKS[benchmark].labels
+    records = []
     for row in rows:
-        predicted = parse_prediction(predict(row["image"]), classes)
-        results.append({"image": row["image"], "label": row["label"],
-                        "prediction": predicted, "correct": predicted == row["label"]})
-    correct = sum(item["correct"] for item in results)
-    return {"total": len(results), "correct": correct,
-            "accuracy": correct / len(results) if results else 0.0,
-            "results": results}
+        label = int(row["label"])
+        if label not in range(len(labels)):
+            raise ValueError(f"Label out of range: {label}")
+        raw = str(predict(row["image"], BENCHMARKS[benchmark].prompt))
+        records.append({"image": row["image"], "label": label, "raw_output": raw,
+                        "prediction": parse_prediction(benchmark, raw)})
+    return {"benchmark": benchmark, "split": BENCHMARKS[benchmark].split,
+            "prompt": BENCHMARKS[benchmark].prompt,
+            "metrics": metrics(records, labels), "predictions": records}
+
+
+def load_model(path, adapter=None):
+    import torch
+    from transformers import AutoModel, AutoProcessor, AutoTokenizer
+    dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
+    processor = AutoProcessor.from_pretrained(path, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
+    model = AutoModel.from_pretrained(path, trust_remote_code=True,
+                                     torch_dtype=dtype, device_map="auto")
+    if adapter:
+        from peft import PeftModel
+        model = PeftModel.from_pretrained(model, adapter)
+    return model.eval(), processor, tokenizer
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--csv", type=Path, required=True)
-    parser.add_argument("--image-root", type=Path, default=Path("."))
-    parser.add_argument("--classes", nargs="+", required=True)
+    parser.add_argument("--benchmark", choices=BENCHMARKS, required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--data-root", type=Path, required=True)
     parser.add_argument("--model", default="openbmb/SciCore-Omics")
+    parser.add_argument("--adapter")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    if len(set(args.classes)) != len(args.classes):
-        parser.error("--classes must be unique")
-    with args.csv.open(newline="", encoding="utf-8") as stream:
+    if args.benchmark == "pcam":
+        parser.error("PCam uses evaluate_pcam.py")
+    with args.manifest.open(newline="", encoding="utf-8") as stream:
         rows = list(csv.DictReader(stream))
-    if not rows or any("image" not in row or "label" not in row for row in rows):
-        parser.error("CSV must contain image and label columns and at least one row")
-    if any(row["label"] not in args.classes for row in rows):
-        parser.error("CSV contains a label absent from --classes")
-
+    if not rows or any(not {"image", "label"} <= row.keys() for row in rows):
+        parser.error("Manifest must contain image,label columns and at least one row")
+    model, processor, tokenizer = load_model(args.model, args.adapter)
     import torch
     from PIL import Image
-    from transformers import AutoModel, AutoProcessor, AutoTokenizer
-    dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
-    processor = AutoProcessor.from_pretrained(args.model, trust_remote_code=True)
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
-    model = AutoModel.from_pretrained(args.model, trust_remote_code=True,
-                                      torch_dtype=dtype, device_map="auto").eval()
-    prompt = ("Classify this pathology image into exactly one of: "
-              + ", ".join(args.classes) + ". Reply with the label only.")
 
-    def predict(image_name):
-        path = Path(image_name)
-        if not path.is_absolute():
-            path = args.image_root / path
+    def predict(image_name, prompt):
+        path = args.data_root / image_name
         with Image.open(path) as source:
             image = source.convert("RGB")
             with torch.inference_mode():
                 return model.chat(image=image, msgs=[{"role": "user", "content": prompt}],
-                                  context=None, processor=processor, tokenizer=tokenizer,
-                                  sampling=False, max_new_tokens=16)
+                                  processor=processor, tokenizer=tokenizer,
+                                  max_new_tokens=16, do_sample=False)
 
-    report = evaluate(rows, predict, args.classes)
+    report = evaluate(rows, args.benchmark, predict)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
-    print(f"Accuracy: {report['correct']}/{report['total']} = {report['accuracy']:.4f}")
+    print(json.dumps(report["metrics"], indent=2))
 
 
 if __name__ == "__main__":
