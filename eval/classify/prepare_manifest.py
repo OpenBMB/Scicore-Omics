@@ -52,7 +52,7 @@ def rows_for(benchmark, root, seed=42, max_per_class=None):
             "lc25000_colon": ["colon_image_sets/colon_aca", "colon_image_sets/colon_n"],
         }
         if benchmark not in folders:
-            raise ValueError("PCam uses its TensorFlow Datasets test split; use evaluate_pcam.py")
+            raise ValueError("PCam uses its TensorFlow Datasets validation split; use evaluate_pcam.py")
         rng = random.Random(seed)
         for label, folder in enumerate(folders[benchmark]):
             class_images = images(root / folder)

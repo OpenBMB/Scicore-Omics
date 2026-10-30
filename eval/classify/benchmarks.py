@@ -41,7 +41,7 @@ BENCHMARKS = {
         "Classify whether metastatic tumor is present.\n\n"
         "Classes:\n0: Normal lymph node tissue, no tumor\n"
         "1: Metastatic tumor (cancer cells present)\n\nOutput only 0 or 1.",
-        "TFDS patch_camelyon test; first 32768 examples in original run"),
+        "TFDS patch_camelyon validation; first 32768 examples by default"),
     "lc25000_lung": Benchmark(
         ("lung adenocarcinoma", "lung squamous cell carcinoma", "benign lung tissue"),
         "<image>\nYou are a pathology image classification assistant.\n\n"

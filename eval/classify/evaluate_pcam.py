@@ -1,4 +1,4 @@
-"""Evaluate the first N examples of the TFDS patch_camelyon test split."""
+"""Evaluate the first N examples of the TFDS patch_camelyon validation split."""
 import argparse
 import json
 from pathlib import Path
@@ -20,7 +20,7 @@ def main():
     from PIL import Image
     model, processor, tokenizer = load_model(args.model, args.adapter)
     dataset = tfds.load("patch_camelyon", data_dir=str(args.tfds_dir),
-                        split="test", as_supervised=True)
+                        split="validation", as_supervised=True)
     records = []
     for index, (image_tensor, label_tensor) in enumerate(dataset.take(args.limit)):
         image = Image.fromarray(image_tensor.numpy()).convert("RGB")
