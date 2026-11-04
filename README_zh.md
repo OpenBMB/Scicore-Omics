@@ -253,6 +253,14 @@ SciCore-Omics 的核心实现位于 `model/` 目录中。
 
 ---
 
+## 评测与可复现性（Evaluation and Reproducibility）
+
+我们已公开本研究主要实验任务的评测与分析代码，包括基于转录组的文本生成、基因表达预测、空间域分析、组织病理学分类和病理视觉问答。
+
+相关代码已发布于 [`eval/`](https://github.com/OpenBMB/Scicore-Omics/tree/main/eval) 目录，包含各任务对应的模型推理、预测结果处理及评测指标计算脚本。
+
+---
+
 ## 训练流程
 
 SciCore-Omics 采用分阶段训练设计，而不是单一的端到端训练脚本。
