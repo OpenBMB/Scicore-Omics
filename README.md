@@ -318,7 +318,7 @@ The core implementation lives in `model/`.
 
 ## Performance
 
-The following numbers summarize the main results reported in our current manuscript and release notes. Full benchmark scripts and detailed result tables will be released progressively.
+The following numbers summarize the main results reported in our current manuscript and release notes.
 
 | Task                                 | Input                      | Evaluation                           | Result Summary                                                  |
 | ------------------------------------ | -------------------------- | ------------------------------------ | --------------------------------------------------------------- |
@@ -328,7 +328,13 @@ The following numbers summarize the main results reported in our current manuscr
 | Breast cancer case-level reasoning   | H&E image only             | Expert evaluation                    | Evaluated on 10 breast cancer cases                             |
 | Transcriptome-conditioned generation | Gene input                 | BLEU / ROUGE / BERTScore             | Progressive improvement across staged training                  |
 
-> More detailed benchmark tables, evaluation scripts, and reproduction instructions will be added in future releases.
+---
+
+## Evaluation and Reproducibility
+
+We have publicly released the evaluation and analysis code for the major experimental tasks reported in our study, including transcriptome-conditioned text generation, gene-expression prediction, spatial-domain analysis, histopathology classification, and pathology visual question answering.
+
+The evaluation code is available in the [`eval/`](https://github.com/OpenBMB/Scicore-Omics/tree/main/eval) directory, with task-specific scripts for model inference, prediction processing, and metric computation.
 
 ---
 
